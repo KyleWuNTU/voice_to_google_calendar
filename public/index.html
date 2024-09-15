@@ -4,55 +4,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice to Google Calendar Event</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-        }
-        button {
-            padding: 10px 20px;
-            margin: 10px;
-            font-size: 16px;
-        }
-        #status {
-            margin-top: 20px;
-            font-size: 18px;
-        }
-    </style>
+    <!-- Linking external CSS file from src folder -->
+    <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
-    <h1>Generate Google Calendar Event from Voice</h1>
-    <button id="start-record-btn">Start Recording</button>
-    <button id="stop-record-btn" disabled>Stop Recording</button>
-    <p id="status">Please click "Start Recording" to begin recording.</p>
+    <header>
+        <button id="authorize-btn">Authorize with Google</button>
+    </header>
+    <main>
+        <h1>Generate Google Calendar Event from Voice</h1>
+        <div class="button-container">
+            <button id="start-record-btn" disabled>Start Recording</button>
+            <button id="stop-record-btn" disabled>Stop Recording</button>
+        </div>
+        <p id="status">Please authorize with Google to begin.</p>
+    </main>
+    <footer>
+        <!-- Move logo to the footer, bottom left -->
+        <div class="footer-content">
+            <p>&copy; 2024 Voice to Calendar Event</p>
+        </div>
+    </footer>
 
     <script>
-        function saveToFile(blob) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            a.download = 'recording.webm';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-        }
-
         let mediaRecorder;
         let audioChunks = [];
 
+        const authorizeBtn = document.getElementById('authorize-btn');
         const startRecordBtn = document.getElementById('start-record-btn');
         const stopRecordBtn = document.getElementById('stop-record-btn');
         const statusDisplay = document.getElementById('status');
 
+        // Open OAuth pop-up
+        authorizeBtn.addEventListener('click', () => {
+            const width = 600, height = 600;
+            const left = (screen.width / 2) - (width / 2);
+            const top = (screen.height / 2) - (height / 2);
+
+            // Open a new window to start the OAuth flow
+            const authWindow = window.open('/auth', 'GoogleAuth', `width=${width},height=${height},top=${top},left=${left}`);
+
+            // Poll the window to detect when it is closed
+            const authInterval = setInterval(() => {
+                if (authWindow.closed) {
+                    clearInterval(authInterval);
+                    statusDisplay.textContent = 'Authorization completed, you can now start recording.';
+                    startRecordBtn.disabled = false;  // Enable start recording button
+                    authorizeBtn.disabled = true;  // Disable the authorize button
+                }
+            }, 1000);
+        });
+
+        // Start recording audio
         startRecordBtn.addEventListener('click', async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // Specify MIME type as 'audio/webm'
                 mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
 
                 mediaRecorder.start();
@@ -69,6 +75,7 @@
             }
         });
 
+        // Stop recording audio
         stopRecordBtn.addEventListener('click', () => {
             mediaRecorder.stop();
             statusDisplay.textContent = "Recording stopped, uploading...";
@@ -77,10 +84,6 @@
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                
-                // Save the file locally
-                //saveToFile(audioBlob);
-                
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.webm');
 
