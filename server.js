@@ -160,7 +160,6 @@ async function parseEventDetails(transcript) {
         "descriptions": "Event details or additional information" // Include this field for any additional context (optional)
     }`;
     
-
     const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -178,10 +177,10 @@ async function parseEventDetails(transcript) {
             
             // Default time if start_time or end_time is blank
             if (!eventDetails.start_time) {
-                eventDetails.start_time = '09:00';  // Default start time if missing
+                eventDetails.start_time = '00:00';  // Default start time if missing
             }
             if (!eventDetails.end_time) {
-                eventDetails.end_time = '10:00';  // Default end time if missing
+                eventDetails.end_time = '00:00';  // Default end time if missing
             }
             
             // Combine date and time into ISO format
