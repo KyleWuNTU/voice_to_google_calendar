@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice to Google Calendar Event</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 16px;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generate Google Calendar Event from Voice</h1>
+    <button id="start-record-btn">Start Recording</button>
+    <button id="stop-record-btn" disabled>Stop Recording</button>
+    <p id="status">Please click "Start Recording" to begin recording.</p>
+
+    <script>
+        function saveToFile(blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'recording.webm';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        let mediaRecorder;
+        let audioChunks = [];
+
+        const startRecordBtn = document.getElementById('start-record-btn');
+        const stopRecordBtn = document.getElementById('stop-record-btn');
+        const statusDisplay = document.getElementById('status');
+
+        startRecordBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // Specify MIME type as 'audio/webm'
+                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+                mediaRecorder.start();
+                statusDisplay.textContent = "Recording...";
+                startRecordBtn.disabled = true;
+                stopRecordBtn.disabled = false;
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+            } catch (err) {
+                console.error('Failed to start recording:', err);
+                statusDisplay.textContent = "Failed to start recording, please check browser compatibility.";
+            }
+        });
+
+        stopRecordBtn.addEventListener('click', () => {
+            mediaRecorder.stop();
+            statusDisplay.textContent = "Recording stopped, uploading...";
+            startRecordBtn.disabled = false;
+            stopRecordBtn.disabled = true;
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                
+                // Save the file locally
+                //saveToFile(audioBlob);
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                statusDisplay.textContent = "Recording saved, uploading...";
+
+                try {
+                    const response = await fetch('/upload-audio', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        statusDisplay.textContent = `Event created: ${result.event.summary} at ${result.event.start.dateTime}`;
+                        console.log('Event created successfully:', result.event);
+                    } else {
+                        statusDisplay.textContent = `Error: ${result.error}`;
+                        console.error('Error:', result.error);
+                    }
+                } catch (error) {
+                    statusDisplay.textContent = `Error: ${error.message}`;
+                    console.error('Error:', error);
+                }
+
+                audioChunks = [];  // Clear audio data
+            };
+        });
+    </script>
+</body>
+</html>
