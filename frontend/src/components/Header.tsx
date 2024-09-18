@@ -1,32 +1,28 @@
 import React from 'react';
+import { api } from '../services/api';
 
 interface HeaderProps {
   isAuthorized: boolean;
   userEmail: string;
   onSignOut: () => void;
+  isAuthorizing: boolean;
+  setIsAuthorizing: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const Header: React.FC<HeaderProps> = ({ isAuthorized, userEmail, onSignOut }) => {
+const Header: React.FC<HeaderProps> = ({ isAuthorized, userEmail, onSignOut, isAuthorizing, setIsAuthorizing }) => {
   const handleAuthorize = async () => {
+    setIsAuthorizing(true);
     try {
-      const response = await fetch('http://localhost:3000/auth', { 
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.authUrl) {
-          window.location.href = data.authUrl;
-        } else {
-          console.error('Auth URL not found in response');
-        }
+      const data = await api.getAuthUrl();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
       } else {
-        console.error('Failed to get auth URL:', response.statusText);
+        console.error('Auth URL not found in response');
+        setIsAuthorizing(false);
       }
     } catch (error) {
       console.error('Error:', error);
+      setIsAuthorizing(false);
     }
   };
 
@@ -38,8 +34,10 @@ const Header: React.FC<HeaderProps> = ({ isAuthorized, userEmail, onSignOut }) =
           <span className="user-email">You are signed in as <span className="email">{userEmail}</span></span>
           <button className="auth-button" onClick={onSignOut}>Sign Out</button>
         </div>
+      ) : isAuthorizing ? (
+        <span>Signing in...</span>
       ) : (
-        <button className="auth-button" onClick={handleAuthorize}>Authorize with Google</button>
+        <button className="auth-button" onClick={handleAuthorize}>Sign In with Google</button>
       )}
     </header>
   );

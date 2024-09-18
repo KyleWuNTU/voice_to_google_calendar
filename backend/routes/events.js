@@ -18,13 +18,22 @@ router.post('/upload-audio', upload.single('audio'), async (req, res) => {
         const eventDetails = await parseEventDetails(transcription);
         console.log('Event details:', eventDetails);
 
+        res.json({ message: 'Event details parsed', event: eventDetails });
+    } catch (error) {
+        console.error('Error in /upload-audio route:', error);
+        res.status(500).json({ error: error.message || 'Failed to parse event details' });
+    }
+});
+
+router.post('/create-event', async (req, res) => {
+    try {
         console.log('Creating calendar event');
-        const calendarEvent = await createCalendarEvent(eventDetails);
+        const calendarEvent = await createCalendarEvent(req.body);
         console.log('Google Calendar event:', calendarEvent);
 
         res.json({ message: 'Event created', event: calendarEvent });
     } catch (error) {
-        console.error('Error in /upload-audio route:', error);
+        console.error('Error in /create-event route:', error);
         res.status(500).json({ error: error.message || 'Failed to create event' });
     }
 });

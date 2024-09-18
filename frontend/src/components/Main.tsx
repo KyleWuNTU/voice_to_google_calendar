@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import RecordingButtons from './RecordingButtons';
+import Header from './Header';
+import { api } from '../services/api';
+import EventConfirmation from './EventConfirmation';
 
 interface MainProps {
   isAuthorized: boolean;
@@ -10,6 +13,8 @@ interface MainProps {
 
 const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, setUserEmail }) => {
   const [status, setStatus] = useState('Please authorize with Google to begin.');
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [eventDetails, setEventDetails] = useState<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -37,32 +42,12 @@ const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, s
 
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
-
         setStatus("Recording saved, uploading...");
 
         try {
-          const response = await fetch('/upload-audio', {
-            method: 'POST',
-            body: formData
-          });
-
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.indexOf("application/json") !== -1) {
-            const result = await response.json();
-            if (response.ok) {
-              setStatus(`Event created: ${result.event.summary} at ${result.event.start.dateTime}`);
-              console.log('Event created successfully:', result.event);
-            } else {
-              setStatus(`Error: ${result.error}`);
-              console.error('Error:', result.error);
-            }
-          } else {
-            const text = await response.text();
-            setStatus(`Unexpected response: ${response.status} ${response.statusText}`);
-            console.error('Unexpected response:', text);
-          }
+          const result = await api.uploadAudio(audioBlob);
+          setEventDetails(result.event);
+          setStatus("Please confirm the event details.");
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           setStatus(`Error: ${errorMessage}`);
@@ -74,6 +59,34 @@ const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, s
     }
   };
 
+  const handleConfirmEvent = async () => {
+    try {
+      const response = await api.createEvent(eventDetails);
+      const result = response.event;
+      console.log("Event created:", result);
+
+      let formattedDate = 'Unknown date';
+      if (result.start?.date) {
+        formattedDate = result.start.date;
+      } else if (result.start?.dateTime) {
+        const date = new Date(result.start.dateTime);
+        formattedDate = `${result.start.dateTime.split('T')[0]} at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+      }
+
+      setStatus(`Event created: ${result.summary || 'Untitled event'} on ${formattedDate}`);
+      setEventDetails(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setStatus(`Error: ${errorMessage}`);
+      console.error('Error:', error);
+    }
+  };
+
+  const handleCancelEvent = () => {
+    setEventDetails(null);
+    setStatus('Event creation cancelled. You can start a new recording.');
+  };
+
   const checkAuthStatus = async () => {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -81,33 +94,33 @@ const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, s
 
       if (authStatus === 'success') {
         setStatus('Authorization successful!');
+        setIsAuthorizing(true);
         setTimeout(() => {
           window.history.replaceState({}, document.title, window.location.pathname);
           checkAuthStatusFromServer();
         }, 3000);
       } else if (authStatus === 'error') {
         setStatus('Authorization failed. Please try again.');
+        setIsAuthorizing(false);
       } else {
         await checkAuthStatusFromServer();
       }
     } catch (error) {
       console.error('Error checking auth status:', error);
+      setIsAuthorizing(false);
     }
   };
 
   const checkAuthStatusFromServer = async () => {
-    const response = await fetch('http://localhost:3000/auth/status', {
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-    if (response.ok) {
-      const data = await response.json();
+    try {
+      const data = await api.checkAuthStatus();
       setIsAuthorized(data.isAuthorized);
       setUserEmail(data.userEmail || '');
       setStatus(data.isAuthorized ? 'You are authorized and ready to record!' : 'Please authorize with Google to begin.');
-    } else {
-      console.error('Failed to check auth status:', response.statusText);
+    } catch (error) {
+      console.error('Failed to check auth status:', error);
+    } finally {
+      setIsAuthorizing(false);
     }
   };
 
@@ -122,16 +135,44 @@ const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, s
     };
   }, []);
 
+  const handleSignOut = async () => {
+    try {
+      await api.signOut();
+      setIsAuthorized(false);
+      setUserEmail('');
+      setStatus('Please authorize with Google to begin.');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
-    <main className="main">
-      <h1 className="main-title">Generate Google Calendar Event from Voice</h1>
-      <RecordingButtons
+    <>
+      <Header
         isAuthorized={isAuthorized}
-        onStartRecording={handleStartRecording}
-        onStopRecording={handleStopRecording}
+        userEmail={userEmail}
+        onSignOut={handleSignOut}
+        isAuthorizing={isAuthorizing}
+        setIsAuthorizing={setIsAuthorizing}
       />
-      <p id="status">{status}</p>
-    </main>
+      <main className="main">
+        <h1 className="main-title">Generate Google Calendar Event from Voice</h1>
+        {eventDetails ? (
+          <EventConfirmation
+            eventDetails={eventDetails}
+            onConfirm={handleConfirmEvent}
+            onCancel={handleCancelEvent}
+          />
+        ) : (
+          <RecordingButtons
+            isAuthorized={isAuthorized}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+          />
+        )}
+        <p id="status">{status}</p>
+      </main>
+    </>
   );
 };
 
