@@ -1,7 +1,7 @@
-const express = require('express');
-const fs = require('fs');
-const oauth2Client = require('../config/google-calendar');
-const { google } = require('googleapis');
+import express from 'express';
+import fs from 'fs';
+import oauth2Client from '../config/google-calendar.js';
+import { google } from 'googleapis';
 
 const router = express.Router();
 
@@ -56,4 +56,4 @@ router.post('/signout', (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

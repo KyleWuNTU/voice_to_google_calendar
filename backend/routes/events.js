@@ -1,8 +1,8 @@
-const express = require('express');
-const upload = require('../middleware/upload');
-const transcribeAudio = require('../services/transcription');
-const parseEventDetails = require('../services/event-parser');
-const createCalendarEvent = require('../services/calendar');
+import express from 'express';
+import upload from '../middleware/upload.js';
+import transcribeAudio from '../services/transcription.js';
+import parseEventDetails from '../services/event-parser.js';
+import createCalendarEvent from '../services/calendar.js';
 
 const router = express.Router();
 
@@ -13,8 +13,6 @@ router.post('/upload-audio', upload.single('audio'), async (req, res) => {
         console.log('Starting audio transcription');
         const transcription = await transcribeAudio(audioPath);
         console.log('Transcription result:', transcription);
-
-        console.log('Parsing event details');
         const eventDetails = await parseEventDetails(transcription);
         console.log('Event details:', eventDetails);
 
@@ -38,4 +36,4 @@ router.post('/create-event', async (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;

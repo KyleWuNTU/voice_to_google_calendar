@@ -1,6 +1,5 @@
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
+import multer from 'multer';
+import fs from 'fs';
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -18,12 +17,12 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'audio/webm') {
+    if (file.mimetype.includes('webm')) {
       cb(null, true);
     } else {
-      cb(new Error('Only WebM audio files are allowed'), false);
+      cb(new Error('Only WebM files are allowed'), false);
     }
   }
 });
 
-module.exports = upload;
+export default upload;

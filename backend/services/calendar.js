@@ -1,5 +1,5 @@
-const { google } = require('googleapis');
-const oauth2Client = require('../config/google-calendar');
+import { google } from 'googleapis';
+import oauth2Client from '../config/google-calendar.js';
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
@@ -46,4 +46,4 @@ async function createCalendarEvent(details) {
     }
 }
 
-module.exports = createCalendarEvent;
+export default createCalendarEvent;

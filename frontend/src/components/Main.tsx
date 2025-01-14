@@ -20,18 +20,57 @@ const Main: React.FC<MainProps> = ({ isAuthorized, setIsAuthorized, userEmail, s
 
   const handleStartRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // 1. 先測試麥克風
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 44100,
+          sampleSize: 16,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      });
 
-      mediaRecorderRef.current.start();
+      // 2. 檢查音訊軌道
+      const audioTracks = stream.getAudioTracks();
+      console.log('Audio tracks:', audioTracks);
+      if (audioTracks.length === 0) {
+        throw new Error('No audio track found');
+      }
+
+      // 3. 設定 MediaRecorder 並增加錄音時間間隔
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000
+      });
+
+      // 4. 增加音量監測
+      const audioContext = new AudioContext();
+      const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      mediaStreamSource.connect(analyser);
+      
+      // 5. 修改數據收集間隔，從 100ms 改為 1000ms
+      mediaRecorderRef.current.start(1000);
       setStatus("Recording...");
 
+      // 6. 改進數據收集的處理
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          console.log('Received audio chunk:', {
+            size: event.data.size,
+            type: event.data.type,
+            timestamp: new Date().toISOString()
+          });
+          audioChunksRef.current.push(event.data);
+        } else {
+          console.warn('Received empty audio chunk');
+        }
       };
+
     } catch (err) {
-      console.error('Failed to start recording:', err);
-      setStatus("Failed to start recording, please check browser compatibility.");
+      console.error('Recording setup failed:', err);
+      setStatus("Failed to start recording: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 

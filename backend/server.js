@@ -1,9 +1,9 @@
-require('dotenv').config();
-const express = require('express');
-const path = require('path');
-const authRoutes = require('./routes/auth');
-const eventRoutes = require('./routes/events');
-const cors = require('cors');
+import dotenv from 'dotenv';
+dotenv.config();
+import express from 'express';
+import authRoutes from './routes/auth.js';
+import eventRoutes from './routes/events.js';
+import cors from 'cors';
 const app = express();
 const port = process.env.PORT || 3000;
 

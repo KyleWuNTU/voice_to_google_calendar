@@ -1,5 +1,5 @@
-const fs = require('fs');
-const openai = require('../config/openai');
+import fs from 'fs';
+import openai from '../config/openai.js';
 
 async function transcribeAudio(filePath) {
     const fileStream = fs.createReadStream(filePath);
@@ -12,4 +12,4 @@ async function transcribeAudio(filePath) {
     return response;
 }
 
-module.exports = transcribeAudio;
+export default transcribeAudio;

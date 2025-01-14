@@ -1,4 +1,5 @@
-const openai = require('../config/openai');
+//import openai from '../config/openai.js';
+import langchainOpenai from '../config/langchain-openai.js';
 
 function isValidJSON(content) {
     try {
@@ -14,24 +15,53 @@ function cleanString(str) {
 }
 
 async function parseEventDetails(transcript) {
-    const response = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-            { role: "system", content: "You are a helpful assistant that extracts event details from text." },
-            { role: "user", content: `Here is the transcribed audio content: "${transcript}". Please extract the event title (mandatory), date (mandatory), start time (if mentioned), end time (if mentioned), location (optional), and descriptions (optional, for any additional information). If no start time, end time, location, or descriptions are mentioned, do not include those fields in the JSON. The fields 'title' and 'date' must always be included. If the year is not specified in the date, use MM-DD format. Include any additional relevant details or context in the 'descriptions' field, if available. Only return a valid JSON structure in this format, with no explanations or additional text:
-    {
-        "title": "Event Title", // Mandatory
-        "date": "MM-DD" or "YYYY-MM-DD", // Mandatory, use MM-DD if year not specified
-        "start_time": "HH:MM", // Include this field only if mentioned
-        "end_time": "HH:MM",   // Include this field only if mentioned
-        "location": "Event Location", // Include this field only if mentioned (optional)
-        "descriptions": "Event details or additional information" // Include this field for any additional context (optional)
-    }`
-    }]
-    });
-
-    const content = response.choices[0].message.content;
     try {
+        // Create schema for the event details
+        const schema = {
+            type: "object",
+            properties: {
+                title: { type: "string", description: "Event title" },
+                date: { type: "string", description: "Date in YYYY-MM-DD format" },
+                start_time: { type: "string", description: "Start time in HH:MM format" },
+                end_time: { type: "string", description: "End time in HH:MM format" },
+                location: { type: "string", description: "Event location" },
+                description: { type: "string", description: "Event details or additional information" }
+            },
+            required: ["title", "date"]
+        };
+        const currentYear = new Date().getFullYear();
+        const currentDate = new Date().toISOString().split('T')[0];
+        const userPrompt = `You are a helpful assistant that extracts event details from text. Here is the transcribed audio content: "${transcript}"
+                            Please extract the following event details:
+
+                            - title (mandatory)
+                            - date (mandatory) in YYYY-MM-DD format (current date is: ${currentDate}. If year is not mentioned, use current year: ${currentYear})
+                            - start time (if mentioned)
+                            - end time (if mentioned)
+                            - location (optional)
+                            - descriptions (optional, for any additional information)
+
+                            Requirements:
+                            - If no start time, end time, location, or descriptions are mentioned, do not include those fields
+                            - The fields 'title' and 'date' must always be included
+                            - If the year is not specified in the date, use MM-DD format
+                            - Include any additional relevant details or context in the 'descriptions' field
+
+                            Only return a valid JSON structure in this format, with no explanations or additional text:
+                            {
+                                "title": "Event Title",
+                                "date": "MM-DD" or "YYYY-MM-DD",
+                                "start_time": "HH:MM",
+                                "end_time": "HH:MM",
+                                "location": "Event Location",
+                                "descriptions": "Event details or additional information"
+                            }`;
+
+        const model = langchainOpenai.withStructuredOutput(schema);
+        const response = await model.invoke(userPrompt);
+        const content = JSON.stringify(response);
+        console.log(content);
+        
         if (isValidJSON(content)) {
             const cleanedContent = cleanString(content);
             const eventDetails = JSON.parse(cleanedContent);
@@ -102,4 +132,4 @@ async function parseEventDetails(transcript) {
     }
 }
 
-module.exports = parseEventDetails;
+export default parseEventDetails;
